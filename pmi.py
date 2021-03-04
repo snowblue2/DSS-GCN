@@ -71,27 +71,27 @@ def pmi_matrix(text):
     return matrix
 
 
-ss = ['Text representation learning is the first and essential step for the text classification problem.']
-res = pmi_matrix(ss[0])
-print(res)
+# ss = ['Text representation learning is the first and essential step for the text classification problem.']
+# res = pmi_matrix(ss[0])
+# print(res)
 
 
 
 
-# fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
-# sentences = []
-# lines = fin.readlines()
-# for i in range(0, len(lines), 3):
-#     text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
-#     aspect = lines[i + 1].lower().strip()
-#     sentence = text_left + ' ' + aspect + ' ' + text_right
-#     stop_words = stopword()
-#     sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
-#     sentences.append(sentence)
-#
-# sentences = sorted(set(sentences),key=sentences.index)
-# df = co_occurrence(sentences, 50)
-# print(df)
+fin = open('data/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+sentences = []
+lines = fin.readlines()
+for i in range(0, len(lines), 3):
+    text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
+    aspect = lines[i + 1].lower().strip()
+    sentence = text_left + ' ' + aspect + ' ' + text_right
+    stop_words = stopword()
+    sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
+    sentences.append(sentence)
+
+sentences = sorted(set(sentences),key=sentences.index)
+df = co_occurrence(sentences, 50)
+print(df)
 # ppmi = pmi(df, positive=True)
 # #a = ppmi.iloc[300].sort_values()
 # #b = ppmi.sort_values(by="but", ascending = True)
