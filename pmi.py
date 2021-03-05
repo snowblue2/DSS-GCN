@@ -3,6 +3,7 @@ import numpy as np
 from collections import defaultdict
 import spacy
 import pickle
+from data_utils import *
 from nltk.corpus import stopwords
 
 def co_occurrence(sentences, window_size):
@@ -52,7 +53,7 @@ def pmi(df, positive=True):
 def stopword():
     #得到所有的停用词
     stop_words = []
-    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+', "-" ,'*', '/']:
+    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+', "-" ,'*', '/', ]:
         stop_words.append(w)
     return stop_words
 
@@ -60,28 +61,25 @@ def pmi_matrix(text):
     nlp = spacy.load('en_core_web_sm')
     document = nlp(text)
     seq_len = len(text.split())
-    with open('./data/pmi_dict.pkl', 'rb') as f1:
+    with open('./datasets/rest16_train_pmi_dict.pkl', 'rb') as f1:
         ppmi_dict = pickle.load(f1)
     matrix = np.zeros((seq_len, seq_len)).astype('float32')
 
     for token in document:
         for token2 in document:
-            matrix[token.i][token2.i] = ppmi_dict.loc[token.text, token2.text]
-        matrix[matrix<0.3] = 0
+            try:
+                matrix[token.i][token2.i] = ppmi_dict.loc[token.text, token2.text]
+            except:
+                pass
+    matrix[matrix<0.3] = 0
     return matrix
 
 
-ss = ['i am not a vegetarian but , almost all the dishes were great .']
-res = pmi_matrix(ss[0])
-print(res)
 
-
-
-
-# fin = open('data/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+# fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
 # sentences = []
 # lines = fin.readlines()
-# for i in range(0, len(lines), 3):
+# for i in range(0, len(lines)-3, 3):
 #     text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
 #     aspect = lines[i + 1].lower().strip()
 #     sentence = text_left + ' ' + aspect + ' ' + text_right
@@ -89,18 +87,36 @@ print(res)
 #     sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
 #     sentences.append(sentence)
 #
-# sentences = sorted(set(sentences),key=sentences.index)
-# df = co_occurrence(sentences, 50)
-# df = pmi(df)
+# sentences = sorted(set(sentences),key=sentences.index)  #去除重复的句子
+# df = co_occurrence(sentences, 50)   #根据整个语料构建共现词表
+# pmi_dict = pmi(df)
+# b = pmi_dict.sort_values(by="'ve", ascending = True)
+# print(b)
+# f = open('./datasets/rest16_train_pmi_dict.pkl', 'wb')
+# pickle.dump(pmi, f)
 
-# ppmi = pmi(df, positive=True)
-# #a = ppmi.iloc[300].sort_values()
-# #b = ppmi.sort_values(by="but", ascending = True)
-# #c = ppmi.sort_values(by="but", ascending = False)['but']
-# print(ppmi['the']['food'])
-#
-# f = open('./data/pmi_dict.pkl', 'wb')
-# pickle.dump(ppmi, f)
+all_matrix = []
+fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+lines = fin.readlines()
+for i in range(0, len(lines)-3, 3):
+    text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
+    aspect = lines[i + 1].lower().strip()
+    sentence = text_left + ' ' + aspect + ' ' + text_right
+    stop_words = stopword()
+    sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
+    pmi = pmi_matrix(sentence)
+    pmi = pmi/pmi.max()
+    pmi[pmi<0.4] = 0
+    all_matrix.append(pmi)
+print((all_matrix))
+f = open('./datasets/rest16_train_pmi', 'wb')
+pickle.dump(all_matrix, f)
+
+
+
+
+
+
 
 
 
