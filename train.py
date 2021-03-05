@@ -39,7 +39,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     model_classes = {
-        'regcn':1,
+        'regcn':2,
     }
     input_colses = {
         'afgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph'],
