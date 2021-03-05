@@ -39,7 +39,7 @@ def pmi(df, positive=True):
     col_totals = df.sum(axis=0)
     total = col_totals.sum()
     row_totals = df.sum(axis=1)
-    expected = np.outer(row_totals, col_totals) / total
+    expected = np.outer(row_totals, col_totals) / total #每个单词与不同词的共现次数除以单词所有共现次数的和
     df = df / expected
     # Silence distracting warnings about log(0):
     with np.errstate(divide='ignore'):
@@ -67,31 +67,32 @@ def pmi_matrix(text):
     for token in document:
         for token2 in document:
             matrix[token.i][token2.i] = ppmi_dict.loc[token.text, token2.text]
-
+        matrix[matrix<0.3] = 0
     return matrix
 
 
-# ss = ['Text representation learning is the first and essential step for the text classification problem.']
-# res = pmi_matrix(ss[0])
-# print(res)
+ss = ['i am not a vegetarian but , almost all the dishes were great .']
+res = pmi_matrix(ss[0])
+print(res)
 
 
 
 
-fin = open('data/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
-sentences = []
-lines = fin.readlines()
-for i in range(0, len(lines), 3):
-    text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
-    aspect = lines[i + 1].lower().strip()
-    sentence = text_left + ' ' + aspect + ' ' + text_right
-    stop_words = stopword()
-    sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
-    sentences.append(sentence)
+# fin = open('data/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+# sentences = []
+# lines = fin.readlines()
+# for i in range(0, len(lines), 3):
+#     text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
+#     aspect = lines[i + 1].lower().strip()
+#     sentence = text_left + ' ' + aspect + ' ' + text_right
+#     stop_words = stopword()
+#     sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
+#     sentences.append(sentence)
+#
+# sentences = sorted(set(sentences),key=sentences.index)
+# df = co_occurrence(sentences, 50)
+# df = pmi(df)
 
-sentences = sorted(set(sentences),key=sentences.index)
-df = co_occurrence(sentences, 50)
-print(df)
 # ppmi = pmi(df, positive=True)
 # #a = ppmi.iloc[300].sort_values()
 # #b = ppmi.sort_values(by="but", ascending = True)
