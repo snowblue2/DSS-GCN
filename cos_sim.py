@@ -40,10 +40,10 @@ class Tokenizer(object):
 
 
 
-with open('./datasets/300_rest16_embedding_matrix.pkl', 'rb') as f:     #特定数据集的glove词嵌入
+with open('./300_rest16_embedding_matrix.pkl', 'rb') as f:     #特定数据集的glove词嵌入
     embedding_matrix = pickle.load(f)
 
-with open('datasets/rest16_word2idx.pkl', 'rb') as f:   #特定数据集的词表
+with open('./rest16_word2idx.pkl', 'rb') as f:   #特定数据集的词表
     word2idx = pickle.load(f)
     tokenizer = Tokenizer(word2idx=word2idx)
 
@@ -63,10 +63,10 @@ for i in range(0, len(lines)-3, 3):
     for num1 in range(len(text_glove)):
         for num2 in range(len(text_glove)):
             cossim_matrix[num1][num2] = torch.cosine_similarity(text_glove[num1], text_glove[num2], dim=0)
-    cossim_matrix[cossim_matrix<0.6] = 0
+    cossim_matrix[cossim_matrix<0.4] = 0
     all_matrix.append(cossim_matrix)
 print(len(all_matrix))
 
-f = open('./datasets/rest16_train_cossim', 'wb')
+f = open('./datasets/semeval16/restaurant_train.raw_cos.graph', 'wb')
 pickle.dump(all_matrix, f)
 

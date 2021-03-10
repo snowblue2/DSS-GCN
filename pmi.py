@@ -53,7 +53,7 @@ def pmi(df, positive=True):
 def stopword():
     #得到所有的停用词
     stop_words = []
-    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+', "-" ,'*', '/', ]:
+    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+' ,'*', ]:
         stop_words.append(w)
     return stop_words
 
@@ -61,7 +61,7 @@ def pmi_matrix(text):
     nlp = spacy.load('en_core_web_sm')
     document = nlp(text)
     seq_len = len(text.split())
-    with open('./datasets/rest16_train_pmi_dict.pkl', 'rb') as f1:
+    with open('./datasets/semeval16/rest16_train_pmi_dict.pkl', 'rb') as f1:
         ppmi_dict = pickle.load(f1)
     matrix = np.zeros((seq_len, seq_len)).astype('float32')
 
@@ -71,12 +71,12 @@ def pmi_matrix(text):
                 matrix[token.i][token2.i] = ppmi_dict.loc[token.text, token2.text]
             except:
                 pass
-    matrix[matrix<0.3] = 0
+    #matrix[matrix<0.3] = 0
     return matrix
 
 
 
-# fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+# fin = open('datasets/semeval16/restaurant_test.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
 # sentences = []
 # lines = fin.readlines()
 # for i in range(0, len(lines)-3, 3):
@@ -90,10 +90,8 @@ def pmi_matrix(text):
 # sentences = sorted(set(sentences),key=sentences.index)  #去除重复的句子
 # df = co_occurrence(sentences, 50)   #根据整个语料构建共现词表
 # pmi_dict = pmi(df)
-# b = pmi_dict.sort_values(by="'ve", ascending = True)
-# print(b)
-# f = open('./datasets/rest16_train_pmi_dict.pkl', 'wb')
-# pickle.dump(pmi, f)
+# f = open('./datasets/semeval16/rest16_test_pmi_dict.pkl', 'wb')
+# pickle.dump(pmi_dict, f)
 
 all_matrix = []
 fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
@@ -103,13 +101,14 @@ for i in range(0, len(lines)-3, 3):
     aspect = lines[i + 1].lower().strip()
     sentence = text_left + ' ' + aspect + ' ' + text_right
     stop_words = stopword()
-    sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
+    sentence = ' '.join([s for s in sentence.split()]) ##if s not in stop_words])
+    print(sentence)
     pmi = pmi_matrix(sentence)
     pmi = pmi/pmi.max()
     pmi[pmi<0.4] = 0
     all_matrix.append(pmi)
 print((all_matrix))
-f = open('./datasets/rest16_train_pmi', 'wb')
+f = open('./datasets/semeval16/restaurant_train.raw_pmi.graph', 'wb')
 pickle.dump(all_matrix, f)
 
 

@@ -118,9 +118,9 @@ class ABSADatesetReader:
         cos_graph = pickle.load(fin)
         fin.close()
 
-        # fin = open(fname+'.graph', 'rb')
-        # dep_graph = pickle.load(fin)
-        # fin.close()
+        fin = open(fname+'_dep.graph', 'rb')
+        dep_graph = pickle.load(fin)
+        fin.close()
 
         all_data = []
         for i in range(0, len(lines)-3, 3):
@@ -144,8 +144,10 @@ class ABSADatesetReader:
             polarity = int(polarity)+1
             pmi_graph1 = pmi_graph[i//3]
             cos_graph1 = cos_graph[i//3]
-            # dep_graph = dep_graph[i // 3]
+            dep_graph1 = dep_graph[i]
             data = {
+                'context':sentence,
+                'aspect':aspect,
                 'text_indices': text_indices,
                 'context_indices': context_indices,
                 'aspect_indices': aspect_indices,
@@ -153,8 +155,7 @@ class ABSADatesetReader:
                 'polarity': polarity,
                 'pmi_graph': pmi_graph1,
                 'cos_graph':cos_graph1,
-                # 'dep_graph': dep_graph,
-
+                'dep_graph': dep_graph1,
 
             }
 
@@ -187,7 +188,7 @@ class ABSADatesetReader:
 
         }
 
-        text = ABSADatesetReader.__read_text__([fname[dataset]['train'], fname[dataset]['test']])  # 所有的text
+        text = ABSADatesetReader.__read_text__([fname[dataset]['train'], fname[dataset]['test']])  # 所有的text去生成word2idx
 
         if os.path.exists(dataset+'_word2idx.pkl'):     #加载特定数据集的word2idx
             print("loading {0} tokenizer...".format(dataset))
@@ -202,6 +203,6 @@ class ABSADatesetReader:
 
         self.embedding_matrix = build_embedding_matrix(tokenizer.word2idx, embed_dim, dataset)
         self.train_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['train'], tokenizer,post_vocab))
-        # self.test_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['test'], tokenizer,post_vocab))
+        self.test_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['test'], tokenizer,post_vocab))
 
 
