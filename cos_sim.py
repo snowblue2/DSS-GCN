@@ -40,10 +40,10 @@ class Tokenizer(object):
 
 
 
-with open('./300_rest16_embedding_matrix.pkl', 'rb') as f:     #特定数据集的glove词嵌入
+with open('./300_lap14_embedding_matrix.pkl', 'rb') as f:     #特定数据集的glove词嵌入
     embedding_matrix = pickle.load(f)
 
-with open('./rest16_word2idx.pkl', 'rb') as f:   #特定数据集的词表
+with open('./lap14_word2idx.pkl', 'rb') as f:   #特定数据集的词表
     word2idx = pickle.load(f)
     tokenizer = Tokenizer(word2idx=word2idx)
 
@@ -51,7 +51,7 @@ with open('./rest16_word2idx.pkl', 'rb') as f:   #特定数据集的词表
 embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float)) #glvoe矩阵
 all_matrix = []
 
-fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+fin = open('datasets/semeval14/laptop_test.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
 lines = fin.readlines()
 for i in range(0, len(lines)-3, 3):
     text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
@@ -67,6 +67,6 @@ for i in range(0, len(lines)-3, 3):
     all_matrix.append(cossim_matrix)
 print(len(all_matrix))
 
-f = open('./datasets/semeval16/restaurant_train.raw_cos.graph', 'wb')
+f = open('./datasets/semeval14/laptop_test.raw_cos.graph', 'wb')
 pickle.dump(all_matrix, f)
 

@@ -35,10 +35,22 @@ class REGCN(nn.Module):
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc3 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc4 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.gc5 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.gc6 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.gc7 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.gc8 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc3 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc4 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
 
+        self.lnet = nn.Linear(4*opt.hidden_dim, 2 * opt.hidden_dim)
+        self.bnet = nn.Linear(2*opt.hidden_dim, 4 * opt.hidden_dim)
         self.fc = nn.Linear(2*opt.hidden_dim, opt.polarities_dim)
         self.dfc = nn.Linear(4*opt.hidden_dim, opt.polarities_dim)
-        self.text_embed_dropout = nn.Dropout(0.3)
+        self.text_embed_dropout = nn.Dropout(opt.dropout)
+        self.weight = nn.Parameter(torch.FloatTensor(4 * opt.hidden_dim, 4 * opt.hidden_dim))
+        self.bias = nn.Parameter(torch.FloatTensor(4 * opt.hidden_dim))
 
     def position_weight(self, x, aspect_double_idx, text_len, aspect_len):
         batch_size = x.shape[0]
@@ -60,6 +72,13 @@ class REGCN(nn.Module):
         weight = torch.tensor(weight).unsqueeze(2).to(self.opt.device)
         return weight*x
 
+    def cross_network(self,f0,fn):
+        fn_weight = torch.matmul(fn,self.weight)
+        fl = f0*fn_weight + self.bias + f0
+        x = fl[:,:,0:2*self.opt.hidden_dim]
+        y = fl[:,:,2*self.opt.hidden_dim:]
+        return x,y
+
     def mask(self, x, aspect_double_idx):
         batch_size, seq_len = x.shape[0], x.shape[1]
         aspect_double_idx = aspect_double_idx.cpu().numpy()
@@ -75,7 +94,7 @@ class REGCN(nn.Module):
         return mask*x
 
     def forward(self, inputs):
-        text_indices, aspect_indices, left_indices, pmi_adj, dep_adj = inputs
+        text_indices, aspect_indices, left_indices, pmi_adj, cos_adj, dep_adj = inputs
         text_len = torch.sum(text_indices != 0, dim=-1)
         aspect_len = torch.sum(aspect_indices != 0, dim=-1)
         left_len = torch.sum(left_indices != 0, dim=-1)
@@ -83,19 +102,28 @@ class REGCN(nn.Module):
         text = self.embed(text_indices)
         text = self.text_embed_dropout(text)
         text_out, (_, _) = self.text_lstm(text, text_len)
+        num_layer = self.opt.num_layer
+        f_n = None
+        f0 = torch.cat([text_out, text_out], dim=2)
 
-        x = F.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), pmi_adj))  #两层aspect-focus GCN
-        x = F.relu(self.gc2(self.position_weight(x, aspect_double_idx, text_len, aspect_len), pmi_adj))
+        for i in range(num_layer):
+            if f_n is None:
+                x_pmi_1 = F.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), pmi_adj))
+                x_pmi_2 = F.relu(self.gc2(self.position_weight(x_pmi_1, aspect_double_idx, text_len, aspect_len), pmi_adj))
+                x_cos_1 = F.relu(self.gc5(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len),cos_adj))
+                x_cos_2 = F.relu(self.gc6(self.position_weight(x_cos_1, aspect_double_idx, text_len, aspect_len),cos_adj))
+                f_n = torch.cat([(x_pmi_2) ,  (x_cos_2)],dim=2)
+            else:#多层的更新
+                x_pmi, x_cos = self.cross_network(f0,f_n)
+                x_d_pmi = F.relu(self.gc3(self.position_weight(x_pmi, aspect_double_idx, text_len, aspect_len), dep_adj))
+                x_d_cos = F.relu(self.gc7(self.position_weight(x_cos, aspect_double_idx, text_len, aspect_len), dep_adj))
+                f_n = torch.cat([(0.3*x_pmi_2 + x_d_pmi) ,  (0.3*x_cos_2 + x_d_cos)],dim=2)
 
-        x_d = F.relu(self.gc3(self.position_weight(x, aspect_double_idx, text_len, aspect_len), dep_adj)) #两层inter-aspect GCN
-        x_d = F.relu(self.gc4(self.position_weight(x_d, aspect_double_idx, text_len, aspect_len), dep_adj))
 
-        x += 0.2 * x_d
 
-        x = self.mask(x, aspect_double_idx) #除aspect外置零
-        alpha_mat = torch.matmul(x, text_out.transpose(1, 2))   #注意力机制
+        x = self.mask(f_n, aspect_double_idx) #除aspect外置零
+        alpha_mat = torch.matmul(x, f0.transpose(1, 2))   #注意力机制
         alpha = F.softmax(alpha_mat.sum(1, keepdim=True), dim=2)
-        x = torch.matmul(alpha, text_out).squeeze(1)
-
-        output = self.fc(x)
+        x = torch.matmul(alpha, f0).squeeze(1)
+        output = self.dfc(x)
         return output

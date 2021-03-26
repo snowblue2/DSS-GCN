@@ -6,6 +6,7 @@ import pickle
 from data_utils import *
 from nltk.corpus import stopwords
 
+
 def co_occurrence(sentences, window_size):
     d = defaultdict(int)
     vocab = set()
@@ -53,15 +54,15 @@ def pmi(df, positive=True):
 def stopword():
     #得到所有的停用词
     stop_words = []
-    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+' ,'*', ]:
+    for w in ['-s', '-ly', '</s>', 's', '$', "'", '+' ,'*','.', '/', '-', ]:
         stop_words.append(w)
     return stop_words
 
-def pmi_matrix(text):
+def pmi_matrix(text, dict_path):
     nlp = spacy.load('en_core_web_sm')
     document = nlp(text)
     seq_len = len(text.split())
-    with open('./datasets/semeval16/rest16_train_pmi_dict.pkl', 'rb') as f1:
+    with open(dict_path, 'rb') as f1:
         ppmi_dict = pickle.load(f1)
     matrix = np.zeros((seq_len, seq_len)).astype('float32')
 
@@ -75,47 +76,73 @@ def pmi_matrix(text):
     return matrix
 
 
+def build_pmi(dataset, model, laptop=False):
+    fin = open('./datasets/' + dataset + '/laptop_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+    sentences = []
+    lines = fin.readlines()
+    for i in range(0, len(lines)-3, 3):
+        text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
+        aspect = lines[i + 1].lower().strip()
+        sentence = text_left + ' ' + aspect + ' ' + text_right
+        # stop_words = stopword()
+        # sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
+        sentences.append(sentence)
 
-# fin = open('datasets/semeval16/restaurant_test.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
-# sentences = []
-# lines = fin.readlines()
-# for i in range(0, len(lines)-3, 3):
-#     text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
-#     aspect = lines[i + 1].lower().strip()
-#     sentence = text_left + ' ' + aspect + ' ' + text_right
-#     stop_words = stopword()
-#     sentence = ' '.join([s for s in sentence.split() if s not in stop_words])
-#     sentences.append(sentence)
-#
-# sentences = sorted(set(sentences),key=sentences.index)  #去除重复的句子
-# df = co_occurrence(sentences, 50)   #根据整个语料构建共现词表
-# pmi_dict = pmi(df)
-# f = open('./datasets/semeval16/rest16_test_pmi_dict.pkl', 'wb')
-# pickle.dump(pmi_dict, f)
-
-all_matrix = []
-fin = open('datasets/semeval16/restaurant_train.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
-lines = fin.readlines()
-for i in range(0, len(lines)-3, 3):
-    text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
-    aspect = lines[i + 1].lower().strip()
-    sentence = text_left + ' ' + aspect + ' ' + text_right
-    stop_words = stopword()
-    sentence = ' '.join([s for s in sentence.split()]) ##if s not in stop_words])
-    print(sentence)
-    pmi = pmi_matrix(sentence)
-    pmi = pmi/pmi.max()
-    pmi[pmi<0.4] = 0
-    all_matrix.append(pmi)
-print((all_matrix))
-f = open('./datasets/semeval16/restaurant_train.raw_pmi.graph', 'wb')
-pickle.dump(all_matrix, f)
+    sentences = sorted(set(sentences),key=sentences.index)  #去除重复的句子
+    df = co_occurrence(sentences, 50)   #根据整个语料构建共现词表
+    pmi_dict = pmi(df)
+    f = open('./datasets/' + dataset + '/' + model + 'lap_pmi_dict.pkl', 'wb') ##要改文件名
+    pickle.dump(pmi_dict, f)
+    print('dict done')
 
 
+def build_pmig(dataset, model,):
+
+    all_matrix = []
+    fin = open('datasets/' + dataset + '/laptop_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+    lines = fin.readlines()
+    for i in range(0, len(lines)-3, 3):
+        text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
+        aspect = lines[i + 1].lower().strip()
+        sentence = text_left + ' ' + aspect + ' ' + text_right
+        stop_words = stopword()
+        sentence = ' '.join([s for s in sentence.split()])
+        print(sentence)
+        pmi = pmi_matrix(sentence, dict_path='./datasets/' + dataset + '/' + model + 'lap_pmi_dict.pkl')
+        pmi = pmi/pmi.max()
+        pmi[pmi<0.3] = 0
+        all_matrix.append(pmi)
+    #print((all_matrix))
+    f = open('./datasets/' + dataset + '/laptop_' + model + '.raw_pmi.graph', 'wb')
+    pickle.dump(all_matrix, f)
+    print('pmi_graph done')
 
 
 
 
+
+
+if __name__ == '__main__':
+    # build_pmi('semeval14', 'train')
+    # build_pmig('semeval14', 'train')
+    # build_pmi('semeval14', 'test')
+    # build_pmig('semeval14', 'test')
+    # build_pmi('semeval15', 'train')
+    # build_pmig('semeval15', 'train')
+    # build_pmi('semeval15', 'test')
+    # build_pmig('semeval15', 'test')
+    # build_pmi('semeval16', 'train')
+    # build_pmig('semeval16', 'train')
+    # build_pmi('semeval16', 'test')
+    # build_pmig('semeval16', 'test')
+
+    a = np.array([[1,2],
+                 [3,4]])
+    Min = np.min(a)
+    Max = np.max(a)
+    b = (a - Min) / (Max - Min)
+    c = np.eye(a.shape[0], a.shape[0])
+    print(a, b, c)
 
 
 
