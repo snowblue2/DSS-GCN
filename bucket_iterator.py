@@ -45,6 +45,7 @@ class BucketIterator(object):
             context_padding = [0] * (max_len - len(context_indices))
             aspect_padding = [0] * (max_len - len(aspect_indices))
             left_padding = [0] * (max_len - len(left_indices))
+            text_len = len(context_indices) + len(aspect_indices)
             batch_context.append(context)
             batch_aspect.append(aspect)
             batch_text_indices.append(text_indices + text_padding)
@@ -53,11 +54,11 @@ class BucketIterator(object):
             batch_left_indices.append(left_indices + left_padding)
             batch_polarity.append(polarity)
             batch_pmi_graph.append(numpy.pad(pmi_graph,
-                ((0,max_len-len(text_indices)),(0,max_len-len(text_indices))), 'constant'))
+                ((0,max_len-text_len),(0,max_len-text_len)), 'constant'))
             batch_cos_graph.append(numpy.pad(cos_graph,
-                ((0,max_len-len(text_indices)),(0,max_len-len(text_indices))), 'constant'))
+                ((0,max_len-text_len),(0,max_len-text_len)), 'constant'))
             batch_dep_graph.append(numpy.pad(dep_graph,
-                ((0,max_len-len(text_indices)),(0,max_len-len(text_indices))), 'constant'))
+                ((0,max_len-text_len),(0,max_len-text_len)), 'constant'))
 
         return { \
             'context': batch_context, \

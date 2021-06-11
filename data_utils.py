@@ -2,7 +2,7 @@ import os
 import pickle
 import numpy as np
 import torch
-
+from transformers import BertTokenizer, BasicTokenizer
 
 def load_pki(path):
     with open(path, 'rb') as f:
@@ -104,8 +104,7 @@ class ABSADatesetReader:
         return text
 
     @staticmethod
-    def __read_data__(fname, tokenizer,post_vocab):
-        #
+    def __read_data__(fname, tokenizer, post_vocab, usebert=0):
         fin = open(fname, 'r', encoding='utf-8', newline='\n', errors='ignore')
         lines = fin.readlines()
         fin.close()
@@ -114,7 +113,7 @@ class ABSADatesetReader:
         pmi_graph = pickle.load(fin)
         fin.close()
 
-        fin = open(fname+'_cos.graph', 'rb')
+        fin = open(fname+'_cos.graph_bert', 'rb')
         cos_graph = pickle.load(fin)
         fin.close()
 
@@ -128,19 +127,23 @@ class ABSADatesetReader:
             aspect = lines[i + 1].lower().strip()
             polarity = lines[i + 2].strip()
             sentence = text_left+' '+aspect+' '+text_right
-            sen_len = len(sentence.split())
-            text_indices = tokenizer.text_to_sequence(text_left + " " + aspect + " " + text_right)
-            context_indices = tokenizer.text_to_sequence(text_left + " " + text_right)
-            aspect_indices = tokenizer.text_to_sequence(aspect)
-            left_indices = tokenizer.text_to_sequence(text_left)
+            if not usebert:
+                text_indices = tokenizer.text_to_sequence(text_left + " " + aspect + " " + text_right)
+                context_indices = tokenizer.text_to_sequence(text_left + " " + text_right)
+                aspect_indices = tokenizer.text_to_sequence(aspect)
+                left_indices = tokenizer.text_to_sequence(text_left)
+            else:
+                berttokenizer = BertTokenizer.from_pretrained('./datasets/bert-base-uncased')
+                text_indices = (berttokenizer.encode(text_left + " " + aspect + " " + text_right, add_special_tokens=True))
+                context_indices = tokenizer.text_to_sequence(text_left + " " + text_right)
+                aspect_indices = tokenizer.text_to_sequence(aspect)
+                left_indices = tokenizer.text_to_sequence(text_left)
+                # context_indices = (berttokenizer.encode(text_left + text_right, add_special_tokens=False))
+                # aspect_indices = (berttokenizer.encode(aspect, add_special_tokens=False))
+                # left_indices = (berttokenizer.encode(text_left, add_special_tokens=False))
 
-            aspect_len = len(aspect.split())
-            left_len = len(text_left.split())
-            right_len = sen_len - aspect_len - left_len
-
-            position = list(range(-left_len,0)) + [0]*aspect_len + list(range(1,right_len + 1))
+            #position = list(range(-left_len,0)) + [0]*aspect_len + list(range(1,right_len + 1))
             # post_emb = [post_vocab.stoi.get(t, post_vocab.unk_index) for t in position]
-
             polarity = int(polarity)+1
             pmi_graph1 = pmi_graph[i//3]
             cos_graph1 = cos_graph[i//3]
@@ -158,16 +161,16 @@ class ABSADatesetReader:
                 'dep_graph': dep_graph1,
 
             }
-
             all_data.append(data)
         return all_data
 
-    def __init__(self, dataset='twitter', embed_dim=300,post_vocab=None):
+    def __init__(self,  dataset='twitter', embed_dim=300, post_vocab=None, usebert=0):
         print("preparing {0} dataset ...".format(dataset))
+        self.usebert = usebert
         fname = {
             'twitter': {
-                'train': './datasets/acl-14-short-data/train.raw',
-                'test': './datasets/acl-14-short-data/test.raw'
+                'train': './datasets/twitter/twitter_train.raw',
+                'test': './datasets/twitter/twitter_test.raw'
             },
             'rest14': {
                 'train': './datasets/semeval14/restaurant_train.raw',
@@ -193,8 +196,9 @@ class ABSADatesetReader:
         if os.path.exists(dataset+'_word2idx.pkl'):     #加载特定数据集的word2idx
             print("loading {0} tokenizer...".format(dataset))
             with open(dataset+'_word2idx.pkl', 'rb') as f:
-                 word2idx = pickle.load(f)
-                 tokenizer = Tokenizer(word2idx=word2idx)
+                word2idx = pickle.load(f)
+                tokenizer = Tokenizer(word2idx=word2idx)
+
         else:
             tokenizer = Tokenizer()
             tokenizer.fit_on_text(text)
@@ -202,7 +206,9 @@ class ABSADatesetReader:
                  pickle.dump(tokenizer.word2idx, f)
 
         self.embedding_matrix = build_embedding_matrix(tokenizer.word2idx, embed_dim, dataset)
-        self.train_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['train'], tokenizer,post_vocab))
-        self.test_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['test'], tokenizer,post_vocab))
+        self.train_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['train'], tokenizer, post_vocab, usebert))
+        self.test_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['test'], tokenizer,post_vocab, usebert))
+
+
 
 
