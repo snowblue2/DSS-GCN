@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertModel
 from layers.dynamic_rnn import DynamicLSTM
 
 class GraphConvolution(nn.Module):
@@ -30,14 +29,8 @@ class REGCN(nn.Module):
     def __init__(self, embedding_matrix, opt):
         super(REGCN, self).__init__()
         self.opt = opt
-        self.usebert = self.opt.usebert
-        if self.usebert:
-            self.embed = BertModel.from_pretrained('./datasets/bert-base-uncased').requires_grad_(False)
-            self.embed.eval()
-            self.text_lstm = DynamicLSTM(768, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        else:
-            self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
-            self.text_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
+        self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
+        self.text_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.gc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc3 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
@@ -45,13 +38,14 @@ class REGCN(nn.Module):
         self.gc5 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc6 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc7 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
-        self.gc8 = GraphConvolution(2 * opt.hidden_dim, 2 * opt.hidden_dim)
-        self.semantic = nn.Sequential(*[GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)  for _ in range(opt.gcn_layer)])
-        self.syntax = nn.Sequential(*[GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)  for _ in range(opt.gcn_layer)])
-        self.dependency = nn.Sequential(*[GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)  for _ in range(opt.gcn_layer)])
+        self.gc8 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc3 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
+        self.ggc4 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
 
-        # self.lnet = nn.Linear(4*opt.hidden_dim, 2 * opt.hidden_dim)
-        # self.bnet = nn.Linear(2*opt.hidden_dim, 4 * opt.hidden_dim)
+        self.lnet = nn.Linear(4*opt.hidden_dim, 2 * opt.hidden_dim)
+        self.bnet = nn.Linear(2*opt.hidden_dim, 4 * opt.hidden_dim)
         self.fc = nn.Linear(2*opt.hidden_dim, opt.polarities_dim)
         self.dfc = nn.Linear(4*opt.hidden_dim, opt.polarities_dim)
         self.text_embed_dropout = nn.Dropout(opt.dropout)
@@ -101,49 +95,35 @@ class REGCN(nn.Module):
 
     def forward(self, inputs):
         text_indices, aspect_indices, left_indices, pmi_adj, cos_adj, dep_adj = inputs
+        text_len = torch.sum(text_indices != 0, dim=-1)
         aspect_len = torch.sum(aspect_indices != 0, dim=-1)
         left_len = torch.sum(left_indices != 0, dim=-1)
         aspect_double_idx = torch.cat([left_len.unsqueeze(1), (left_len+aspect_len-1).unsqueeze(1)], dim=1)
-        if not self.usebert:
-            text_len = torch.sum(text_indices != 0, dim=-1)
-            text = self.embed(text_indices)
-            text_out = self.text_embed_dropout(text)
-            text_out, (_, _) = self.text_lstm(text_out, text_len)
-            f0 = torch.cat([text_out, text_out], dim=2)
-        else:
-            text_len = torch.sum(text_indices != 0, dim=-1) - 1
-            text, pool = self.embed(text_indices)
-            pad0 = torch.zeros((text.shape[0], 1, text.shape[2])).to(self.opt.device)
-            text = torch.cat((text[:, 1:, :], pad0), dim=1) #去除第一个CLS，然后恢复形状
-            text_out = self.text_embed_dropout(text)
-            text_out, (_, _) = self.text_lstm(text_out, text_len - 2)
-            f0 = torch.cat([text_out, text_out], dim=2)
+        text = self.embed(text_indices)
+        text = self.text_embed_dropout(text)
+        text_out, (_, _) = self.text_lstm(text, text_len)
         num_layer = self.opt.num_layer
         f_n = None
-
+        f0 = torch.cat([text_out, text_out], dim=2)
 
         for i in range(num_layer):
-            if i == 0:
+            if f_n is None:
                 x_pmi_1 = F.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), pmi_adj))
                 x_pmi_2 = F.relu(self.gc2(self.position_weight(x_pmi_1, aspect_double_idx, text_len, aspect_len), pmi_adj))
-                x_cos_1 = F.relu(self.gc3(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len),cos_adj))
-                x_cos_2 = F.relu(self.gc4(self.position_weight(x_cos_1, aspect_double_idx, text_len, aspect_len),cos_adj))
-                x_s = torch.cat([(x_pmi_2) ,  (x_cos_2)],dim=2)
-                for j in range(1):
-                    x_pmi, x_cos = self.cross_network(f0,x_s)
-                    x_s = torch.cat([(x_pmi) ,  (x_cos)],dim=2)
-
-            else:#cross model
-                x_d_pmi = F.relu(self.gc5(self.position_weight(x_pmi, aspect_double_idx, text_len, aspect_len), dep_adj))
-                x_p_d = F.relu(self.gc6(self.position_weight(x_d_pmi, aspect_double_idx, text_len, aspect_len), dep_adj))
+                x_cos_1 = F.relu(self.gc5(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len),cos_adj))
+                x_cos_2 = F.relu(self.gc6(self.position_weight(x_cos_1, aspect_double_idx, text_len, aspect_len),cos_adj))
+                f_n = torch.cat([(x_pmi_2) ,  (x_cos_2)],dim=2)
+            else:#多层的更新
+                x_pmi, x_cos = self.cross_network(f0,f_n)
+                x_d_pmi = F.relu(self.gc3(self.position_weight(x_pmi, aspect_double_idx, text_len, aspect_len), dep_adj))
                 x_d_cos = F.relu(self.gc7(self.position_weight(x_cos, aspect_double_idx, text_len, aspect_len), dep_adj))
-                x_c_d = F.relu(self.gc8(self.position_weight(x_d_cos, aspect_double_idx, text_len, aspect_len), dep_adj))
-                f_n = torch.cat([(0.3*x_pmi_2 + x_p_d) ,  (0.3*x_cos_2 + x_c_d)],dim=2)
+                f_n = torch.cat([(0.3*x_pmi_2 + x_d_pmi) ,  (0.3*x_cos_2 + x_d_cos)],dim=2)
+
 
 
         x = self.mask(f_n, aspect_double_idx) #除aspect外置零
         alpha_mat = torch.matmul(x, f0.transpose(1, 2))   #注意力机制
-        alpha = F.softmax(alpha_mat.sum(1, keepdim=True), dim=2)    #aspect多个单词相加得到注意力值（batch,1,sen_len)
-        x = torch.matmul(alpha, f0).squeeze(1)  #(batch,hidden_dim)
+        alpha = F.softmax(alpha_mat.sum(1, keepdim=True), dim=2)
+        x = torch.matmul(alpha, f0).squeeze(1)
         output = self.dfc(x)
-        return output ,text_indices, alpha
+        return output
