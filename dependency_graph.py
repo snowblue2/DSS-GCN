@@ -39,14 +39,12 @@ def process(filename):
 
 
 if __name__ == '__main__':
-    process('./datasets/twitter/twitter_train.raw')
-    process('./datasets/twitter/twitter_test.raw')
     # process('./datasets/acl-14-short-data/train.raw')
     # process('./datasets/acl-14-short-data/test.raw')
     # process('./datasets/semeval14/restaurant_train.raw')
     # process('./datasets/semeval14/restaurant_test.raw')
-    # process('./datasets/semeval14/laptop_train.raw')
-    # process('./datasets/semeval14/laptop_test.raw')
+    process('./datasets/semeval14/laptop_train.raw')
+    process('./datasets/semeval14/laptop_test.raw')
     # process('./datasets/semeval15/restaurant_train.raw')
     # process('./datasets/semeval15/restaurant_test.raw')
     # process('./datasets/semeval16/restaurant_train.raw')
