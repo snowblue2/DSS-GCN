@@ -76,8 +76,8 @@ def pmi_matrix(text, dict_path):
     return matrix
 
 
-def build_pmi(dataset, model, laptop=False):
-    fin = open('./datasets/' + dataset + '/laptop_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+def build_pmi(dataset, model, laptop=False):    #构建特定语料的共现词表
+    fin = open('./datasets/' + dataset + '/twitter_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
     sentences = []
     lines = fin.readlines()
     for i in range(0, len(lines)-3, 3):
@@ -91,42 +91,45 @@ def build_pmi(dataset, model, laptop=False):
     sentences = sorted(set(sentences),key=sentences.index)  #去除重复的句子
     df = co_occurrence(sentences, 50)   #根据整个语料构建共现词表
     pmi_dict = pmi(df)
-    f = open('./datasets/' + dataset + '/' + model + 'lap_pmi_dict.pkl', 'wb') ##要改文件名
+    f = open('./datasets/' + dataset + '/' + model + 'twitter_pmi_dict.pkl', 'wb') ##要改文件名
     pickle.dump(pmi_dict, f)
     print('dict done')
 
 
-def build_pmig(dataset, model,):
+def build_pmig(dataset, model,):    #构建句子中的pmi图
 
     all_matrix = []
-    fin = open('datasets/' + dataset + '/laptop_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
+    fin = open('datasets/' + dataset + '/twitter_' + model + '.raw', 'r', encoding='utf-8', newline='\n', errors='ignore')
     lines = fin.readlines()
     for i in range(0, len(lines)-3, 3):
         text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
         aspect = lines[i + 1].lower().strip()
         sentence = text_left + ' ' + aspect + ' ' + text_right
-        stop_words = stopword()
+        #stop_words = stopword()    #是否去除停留词
         sentence = ' '.join([s for s in sentence.split()])
         print(sentence)
-        pmi = pmi_matrix(sentence, dict_path='./datasets/' + dataset + '/' + model + 'lap_pmi_dict.pkl')
-        pmi = pmi/pmi.max()
-        pmi[pmi<0.3] = 0
+        pmi = pmi_matrix(sentence, dict_path='./datasets/' + dataset + '/' + model + 'twitter_pmi_dict.pkl')
+        pmi[pmi < 0.3] = 0
+        max, min = np.max(pmi), np.min(pmi)
+        pmi = (pmi - min) / (max - min)
+        pmi = (np.nan_to_num(pmi))
         all_matrix.append(pmi)
-    #print((all_matrix))
-    f = open('./datasets/' + dataset + '/laptop_' + model + '.raw_pmi.graph', 'wb')
+
+    f = open('./datasets/' + dataset + '/twitter_' + model + '.raw_pmi.graph', 'wb')
     pickle.dump(all_matrix, f)
     print('pmi_graph done')
 
 
 
-
-
-
 if __name__ == '__main__':
-    # build_pmi('semeval14', 'train')
-    # build_pmig('semeval14', 'train')
-    # build_pmi('semeval14', 'test')
-    # build_pmig('semeval14', 'test')
+    build_pmi('twitter', 'train')
+    build_pmig('twitter', 'train')
+    build_pmi('twitter', 'test')
+    build_pmig('twitter', 'test')
+    #build_pmi('semeval14', 'train')
+    #build_pmig('semeval14', 'train')
+    #build_pmi('semeval14', 'test')
+    #build_pmig('semeval14', 'test')
     # build_pmi('semeval15', 'train')
     # build_pmig('semeval15', 'train')
     # build_pmi('semeval15', 'test')
@@ -136,13 +139,10 @@ if __name__ == '__main__':
     # build_pmi('semeval16', 'test')
     # build_pmig('semeval16', 'test')
 
-    a = np.array([[1,2],
-                 [3,4]])
-    Min = np.min(a)
-    Max = np.max(a)
-    b = (a - Min) / (Max - Min)
-    c = np.eye(a.shape[0], a.shape[0])
-    print(a, b, c)
+
+
+
+
 
 
 
