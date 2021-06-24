@@ -19,7 +19,7 @@ we prepare `300_rest16_embedding_matrix.pkl` for simple test, if you want to get
 
 ## Training
 
-You can find the command lines to train models in `python train.py --batch_size 8 --dataset rest16`.
+You can find the command lines to train models in `python train.py --dataset rest16`.
 
  
 
